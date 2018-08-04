@@ -2,10 +2,10 @@
 # Contributor: Testuser_01 <arch[at]nico-siebler[dot]de>
 # Contributor: Pablo Vilas <pablovilas89[at]gmail[dot]com>
 
+json=
+pkgver=182.3684.70
 pkgname=webstorm-eap
 _pkgname=WebStorm
-pkgver=182.3684.70
-_pkgver=2018.2
 pkgrel=1
 ipkgdesc="JavaScript IDE and HTML editor."
 arch=('i686' 'x86_64')
@@ -13,16 +13,45 @@ options=('!strip')
 url="http://www.jetbrains.com/webstorm"
 license=('custom')
 depends=()
-
-source=(http://download.jetbrains.com/webstorm/${_pkgname}-${_pkgver}.tar.gz
-        jetbrains-webstorm-eap
+makedepends=('jq' 'curl')
+source=(jetbrains-webstorm-eap
         jetbrains-webstorm-eap.desktop
         ${_pkgname}_license.txt)
 
-sha256sums=('26f27b80bd3d562b5518dfaf26e86452cd5bff7732ceba199ad188fe2c649a08'
-            '3712fc9477a8b5a54d970103166b05bf872fa2512c5bee7e63f62a5738e40419'
+sha256sums=('3712fc9477a8b5a54d970103166b05bf872fa2512c5bee7e63f62a5738e40419'
             '931de5f12ab12e62eccaa3648d0cedf5e2c3845cc1e1a37030137fdbc24f54f3'
             '8464fc766dbb4f6a0de4acd84007fc2916b50ca48ce7d22654144f549c8c6f4c')
+
+
+prepare() {
+  echo "Checking for latest Webstorm release..."
+  jetbrains_url="https://data.services.jetbrains.com/products?code=WS&release.type=eap%2Crc%2Crelease"
+  json=$(curl -s $jetbrains_url 2>/dev/null)
+
+  version=$(echo $json | jq -r '.[0].releases[0].version' 2>&1)
+  download=$(echo $json | jq -r '.[0].releases[0].downloads.linux.link' 2>&1)
+  checksum_url=$(echo $json | jq -r '.[0].releases[0].downloads.linux.checksumLink' 2>&1)
+  checksum=$(curl -s $checksum_url | awk '{print $1}' 2>&1)
+
+  # download
+  echo "Downloading ${download}..."
+  curl -L $download -o release.tar.gz
+  
+  # verify checksum
+  checksum_download=$(sha256sum release.tar.gz | awk '{print $1}')
+  if [[ $checksum_download != $checksum ]]; then
+    echo "${checksum_download} != ${checksum}"
+    echo "Invalid checksum. Please try again"
+    return 1
+  fi
+
+  # extract
+  tar -xzf release.tar.gz
+}
+
+pkgver() {
+  echo $json | jq -r '.[0].releases[0].build'
+}
 
 package() {
   cd "${srcdir}"
